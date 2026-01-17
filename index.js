@@ -25,6 +25,9 @@ const API_BASE_URL = 'https://api.yimei.ai';
 const CLIENT_ID = 'c6e0044f161e7f20';
 const CLIENT_SECRET = '4d0c6323f560114b1695b86e9d7aafe4';
 
+// 已购买的服务：仅 pockmark (痘痘检测 = 65536)
+const DEFAULT_DETECT_TYPES = '65536';
+
 // 健康检查
 app.get('/', (req, res) => {
   res.json({ 
@@ -45,7 +48,8 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
   const startTime = Date.now();
   
   try {
-    const detectTypes = req.body.detect_types || '4124';
+    // 使用已购买的服务，忽略客户端传来的 detect_types
+    const detectTypes = DEFAULT_DETECT_TYPES;
     
     if (!req.file) {
       return res.status(400).json({ 
