@@ -59,27 +59,36 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     console.log(`  - 图片大小: ${(req.file.size / 1024).toFixed(2)} KB`);
     console.log(`  - 图片类型: ${req.file.mimetype}`);
 
-    // 构建 multipart form data
+    // 构建 multipart form data（根据文档，使用 multipart/form-data 上传图片）
     const formData = new FormData();
-    formData.append('client_id', CLIENT_ID);
-    formData.append('client_secret', CLIENT_SECRET);
-    formData.append('detect_types', detectTypes);
     formData.append('image', req.file.buffer, {
       filename: 'image.jpg',
       contentType: req.file.mimetype || 'image/jpeg'
     });
 
-    // 调用宜美 AI API
-    const response = await fetch(`${API_BASE_URL}/platform/detectFromFile`, {
+    // 构建 Basic Authorization（base64 编码的 client_id:client_secret）
+    const authString = Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64');
+
+    // 调用宜美 AI API v2 版本
+    // URL 格式: /v2/api/face/analysis/${detect_types}
+    const apiUrl = `${API_BASE_URL}/v2/api/face/analysis/${detectTypes}`;
+    console.log(`  - 调用 API: ${apiUrl}`);
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       body: formData,
-      headers: formData.getHeaders(),
+      headers: {
+        ...formData.getHeaders(),
+        'Authorization': `Basic ${authString}`,
+        'Accept': 'application/json'
+      },
       timeout: 30000 // 30秒超时
     });
 
     const result = await response.json();
     
     const duration = Date.now() - startTime;
+    console.log(`  - HTTP状态: ${response.status}`);
     console.log(`  - API响应码: ${result.code}`);
     console.log(`  - 耗时: ${duration}ms`);
     
