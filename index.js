@@ -282,11 +282,19 @@ async function callVisionAPI(base64Image, prompt) {
       }
     );
 
+    // 打印完整API响应结构
+    console.log('[AI] API响应状态:', response.status);
+    console.log('[AI] API响应结构:', JSON.stringify(response.data, null, 2).substring(0, 1000));
+    
     const content = response.data.choices?.[0]?.message?.content;
-    console.log('[AI] 原始响应:', content?.substring(0, 500));
+    
+    // 打印完整的AI内容
+    console.log('[AI] ========== 完整AI响应开始 ==========');
+    console.log(content || '(空)');
+    console.log('[AI] ========== 完整AI响应结束 ==========');
     
     if (!content) {
-      console.error('[AI] 空响应, 完整数据:', JSON.stringify(response.data));
+      console.error('[AI] 空响应! 完整数据:', JSON.stringify(response.data));
       throw new Error('AI 返回空响应');
     }
 
