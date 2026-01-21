@@ -270,7 +270,7 @@ async function callVisionAPI(base64Image, prompt) {
             ]
           }
         ],
-        max_tokens: 2000,
+        max_tokens: 4096,
         temperature: 0.3
       },
       {
@@ -285,6 +285,12 @@ async function callVisionAPI(base64Image, prompt) {
     // 打印完整API响应结构
     console.log('[AI] API响应状态:', response.status);
     console.log('[AI] API响应结构:', JSON.stringify(response.data, null, 2).substring(0, 1000));
+    
+    // 检查是否因长度被截断
+    const finishReason = response.data.choices?.[0]?.finish_reason;
+    if (finishReason === 'length') {
+      console.warn('[AI] ⚠️ 警告: 响应因超出 max_tokens 被截断!');
+    }
     
     const content = response.data.choices?.[0]?.message?.content;
     
