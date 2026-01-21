@@ -249,6 +249,8 @@ async function callVisionAPI(base64Image, prompt) {
   }
 
   try {
+    console.log(`[AI] 调用 ${OPENAI_MODEL} ...`);
+    
     const response = await axios.post(
       `${OPENAI_BASE_URL}/chat/completions`,
       {
@@ -276,36 +278,78 @@ async function callVisionAPI(base64Image, prompt) {
           'Authorization': `Bearer ${OPENAI_API_KEY}`,
           'Content-Type': 'application/json'
         },
-        timeout: 60000
+        timeout: 120000 // 2 minutes timeout
       }
     );
 
-    const content = response.data.choices[0]?.message?.content;
+    const content = response.data.choices?.[0]?.message?.content;
+    console.log('[AI] 原始响应:', content?.substring(0, 500));
+    
     if (!content) {
+      console.error('[AI] 空响应, 完整数据:', JSON.stringify(response.data));
       throw new Error('AI 返回空响应');
     }
 
-    // 解析 JSON
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('无法解析 AI 响应');
+    // 尝试多种方式解析 JSON
+    let result;
+    
+    // 方式1: 直接解析
+    try {
+      result = JSON.parse(content);
+      console.log('[AI] 直接解析成功');
+    } catch (e1) {
+      // 方式2: 提取 JSON 块
+      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        try {
+          result = JSON.parse(jsonMatch[1]);
+          console.log('[AI] 从代码块解析成功');
+        } catch (e2) {
+          // 继续尝试
+        }
+      }
+      
+      // 方式3: 提取第一个 { } 块
+      if (!result) {
+        const braceMatch = content.match(/\{[\s\S]*\}/);
+        if (braceMatch) {
+          try {
+            result = JSON.parse(braceMatch[0]);
+            console.log('[AI] 从大括号提取成功');
+          } catch (e3) {
+            console.error('[AI] 所有解析方式都失败');
+            console.error('[AI] 内容:', content);
+            throw new Error('无法解析 AI 响应格式');
+          }
+        } else {
+          console.error('[AI] 未找到 JSON 结构');
+          console.error('[AI] 内容:', content);
+          throw new Error('AI 响应不包含 JSON');
+        }
+      }
     }
-
-    const result = JSON.parse(jsonMatch[0]);
     
     if (result.error) {
-      throw new Error(result.message);
+      throw new Error(result.message || '分析失败');
     }
     
+    console.log('[AI] 解析成功:', Object.keys(result).join(', '));
     return result;
   } catch (error) {
-    console.error('Vision API 错误:', error.response?.data || error.message);
+    console.error('[AI] 错误详情:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data
+    });
     
     if (error.response?.status === 401) {
       throw new Error('API 密钥无效');
     }
     if (error.response?.status === 429) {
       throw new Error('API 调用次数超限，请稍后再试');
+    }
+    if (error.response?.status === 400) {
+      throw new Error('图片格式不支持或请求格式错误');
     }
     
     throw new Error(error.message || '分析失败，请重试');
