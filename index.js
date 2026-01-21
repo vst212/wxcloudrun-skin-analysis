@@ -301,39 +301,51 @@ async function callVisionAPI(base64Image, prompt) {
     // 尝试多种方式解析 JSON
     let result;
     
-    // 方式1: 直接解析
+    // 清理内容 - 移除 markdown 代码块标记
+    let cleanContent = content.trim();
+    
+    // 移除开头的 ```json 或 ```
+    if (cleanContent.startsWith('```json')) {
+      cleanContent = cleanContent.substring(7);
+    } else if (cleanContent.startsWith('```')) {
+      cleanContent = cleanContent.substring(3);
+    }
+    
+    // 移除结尾的 ```
+    if (cleanContent.endsWith('```')) {
+      cleanContent = cleanContent.substring(0, cleanContent.length - 3);
+    }
+    
+    cleanContent = cleanContent.trim();
+    console.log('[AI] 清理后内容前100字符:', cleanContent.substring(0, 100));
+    
+    // 方式1: 直接解析清理后的内容
     try {
-      result = JSON.parse(content);
+      result = JSON.parse(cleanContent);
       console.log('[AI] 直接解析成功');
     } catch (e1) {
-      // 方式2: 提取 JSON 块
-      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
-      if (jsonMatch) {
-        try {
-          result = JSON.parse(jsonMatch[1]);
-          console.log('[AI] 从代码块解析成功');
-        } catch (e2) {
-          // 继续尝试
-        }
-      }
+      console.log('[AI] 直接解析失败, 尝试提取大括号...');
       
-      // 方式3: 提取第一个 { } 块
-      if (!result) {
-        const braceMatch = content.match(/\{[\s\S]*\}/);
-        if (braceMatch) {
-          try {
-            result = JSON.parse(braceMatch[0]);
-            console.log('[AI] 从大括号提取成功');
-          } catch (e3) {
-            console.error('[AI] 所有解析方式都失败');
-            console.error('[AI] 内容:', content);
-            throw new Error('无法解析 AI 响应格式');
-          }
-        } else {
-          console.error('[AI] 未找到 JSON 结构');
-          console.error('[AI] 内容:', content);
-          throw new Error('AI 响应不包含 JSON');
+      // 方式2: 提取第一个完整的 { } 块
+      const startIdx = cleanContent.indexOf('{');
+      const endIdx = cleanContent.lastIndexOf('}');
+      
+      if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+        const jsonStr = cleanContent.substring(startIdx, endIdx + 1);
+        console.log('[AI] 提取的JSON长度:', jsonStr.length);
+        
+        try {
+          result = JSON.parse(jsonStr);
+          console.log('[AI] 从大括号提取成功');
+        } catch (e2) {
+          console.error('[AI] JSON解析错误:', e2.message);
+          console.error('[AI] 尝试解析的内容:', jsonStr.substring(0, 200));
+          throw new Error('JSON 格式错误: ' + e2.message);
         }
+      } else {
+        console.error('[AI] 未找到有效的 JSON 结构');
+        console.error('[AI] 清理后内容:', cleanContent);
+        throw new Error('AI 响应不包含有效 JSON');
       }
     }
     
